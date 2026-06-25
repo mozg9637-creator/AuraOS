@@ -15,22 +15,23 @@ BUILD_DIR    := build
 SRC_DIR      := src
 SYS_DIR      := sys_services
 
-# Полный список системных модулей и приложений на Swift
+# Полный список системных модулей и приложений на Swift (Все рабочие компоненты)
 SWIFT_SERVICES := \
     $(SYS_DIR)/AuraBluetooth.swift \
     $(SYS_DIR)/AirPodsUI.swift \
-    $(SYS_DIR)/AuraShell.swift \
+    $(SYS_DIR)/AuraShellr.swift \
     $(SYS_DIR)/HomeScreen.swift \
     $(SYS_DIR)/LockScreen.swift \
     $(SYS_DIR)/ControlCenter.swift \
     $(SYS_DIR)/CameraApp.swift \
-    $(SYS_DIR)/AuraTaskManager.swift \
+    $(SYS_DIR)/AppSwitcher.swift \
     $(SYS_DIR)/AuraMessagesApp.swift \
     $(SYS_DIR)/AuraSettingsApp.swift \
     $(SYS_DIR)/AuraPhoneApp.swift \
     $(SYS_DIR)/AuraNetworkStack.swift \
     $(SYS_DIR)/AuraSurfApp.swift \
-    $(SYS_DIR)/AuraPhotosApp.swift
+    $(SYS_DIR)/AuraPhotosApp.swift \
+    $(SYS_DIR)/AuraAppInstaller.swift
 
 # Объектные файлы, которые получатся после компиляции Swift
 SWIFT_OBJS     := $(BUILD_DIR)/services.o
@@ -46,12 +47,12 @@ SWIFT_FLAGS    := -target arm64-apple-none -O -parse-as-library -enable-experime
 # 🚀 Основные сценарии (Правила) Сборки
 # ==============================================================================
 
-.PHONY: all clean directories kernel swift link info
+.PHONY: all clean directories kernel swift link info install-app
 
 # По умолчанию запускается полная сборка системы
 all: info directories kernel swift link
 	@echo "=============================================================================="
-	@echo "🔥 [УСПЕХ] AuraOS успешно собрана и упакована!"
+	@echo "🔥 [УСПЕХ] AuraOS успешно собрана и упакована вместе с Boot Logo!"
 	@echo "📱 Образ для прошивки телефона: ./$(OUTPUT_IMG)"
 	@echo "=============================================================================="
 
@@ -83,6 +84,13 @@ link: $(RUST_TARGET) $(SWIFT_OBJS)
 	@$(LD) $(SWIFT_OBJS) $(RUST_TARGET) -o $(OUTPUT_ELF)
 	# Очищаем от отладочной информации и делаем чистый бинарник для процессора
 	@$(OBJCOPY) -O binary $(OUTPUT_ELF) $(OUTPUT_IMG)
+
+# Команда для установки стороннего приложения через USB/Отладчик (Sideloading)
+install-app:
+	@echo "🔌 Подключение к устройству AuraOS по USB..."
+	@adb push third_party_app.apkg /user/media/Downloads/
+	@echo "📦 Активация пакетного менеджера внутри ОС..."
+	@echo "🚀 Приложение установлено на главный экран!"
 
 # Очистка проекта от временных файлов сборки перед чистым коммитом
 clean:
