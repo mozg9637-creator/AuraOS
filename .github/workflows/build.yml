@@ -2,8 +2,8 @@ name: Cloud Build AuraOS
 
 on:
   push:
-    branches: [ "**" ] # Срабатывает на ВСЕ ветки, включая "main", "master" и "основной"
-  workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой во вкладке Actions
+    branches: [ "**" ] # Срабатывает на абсолютно любые пуши в любые ветки
+  workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой в браузере
 
 jobs:
   build-os:
@@ -15,8 +15,9 @@ jobs:
 
     - name: 🔍 Поиск Makefile и файлов проекта
       run: |
-        echo "--- Проверяем структуру репозитория ---"
-        ls -R
+        echo "=== СТРУКТУРА КОРНЯ РЕПОЗИТОРИЯ ==="
+        ls -la
+        echo "==================================="
 
     - name: 🛠️ Установка системных утилит (lld, objcopy)
       run: |
@@ -35,18 +36,32 @@ jobs:
 
     - name: 🚀 Запуск компиляции
       run: |
-        # Скрипт сам найдет Makefile, где бы он ни лежал, и запустит сборку там
+        # Автоматический поиск Makefile в репозитории
         MAKEFILE_PATH=$(find . -name "Makefile" | head -n 1)
         if [ -z "$MAKEFILE_PATH" ]; then
-          echo "❌ Ошибка: Makefile не найден в репозитории!"
+          echo "❌ Ошибка: Файл Makefile вообще не найден в репозитории!"
           exit 1
         fi
+        
+        # Переходим в директорию, где лежит найденный Makefile
         cd $(dirname "$MAKEFILE_PATH")
+        
+        echo "=== ПРОВЕРКА ОКРУЖЕНИЯ ПЕРЕД СБОРКОЙ ==="
+        echo "Текущая рабочая директория: $(pwd)"
+        echo "Содержимое папки sys_services:"
+        ls -la sys_services || echo "⚠️ Папка sys_services не найдена по этому пути!"
+        echo "Содержимое папки src:"
+        ls -la src || echo "⚠️ Папка src не найдена по этому пути!"
+        echo "========================================"
+        
+        echo "--- Запуск сборки системы ---"
+        # Запускаем make со стандартным выводом всех шагов компиляции
         make clean
         make all
 
     - name: 💾 Сохранение готовой прошивки
+      if: success() # Выполняется только если сборка прошла успешно
       uses: actions/upload-artifact@v4
       with:
         name: aura_os_firmware
-        path: "**/aura_os.img" # Ищет готовый образ в любой папке, где он собрался
+        path: "**/aura_os.img"
