@@ -2,8 +2,8 @@ name: Cloud Build AuraOS
 
 on:
   push:
-    branches: [ "основной" ] # Собирать систему каждый раз, когда ты делаешь пуш в ветку "основной"
-  workflow_dispatch:        # Позволяет запускать сборку вручную кнопкой на сайте
+    branches: [ "**" ] # Срабатывает на ВСЕ ветки, включая "main", "master" и "основной"
+  workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой во вкладке Actions
 
 jobs:
   build-os:
@@ -12,6 +12,11 @@ jobs:
     steps:
     - name: 📥 Скачивание репозитория
       uses: actions/checkout@v4
+
+    - name: 🔍 Поиск Makefile и файлов проекта
+      run: |
+        echo "--- Проверяем структуру репозитория ---"
+        ls -R
 
     - name: 🛠️ Установка системных утилит (lld, objcopy)
       run: |
@@ -26,15 +31,22 @@ jobs:
     - name: 🎨 Настройка Swift (Embedded)
       uses: swift-actions/setup-swift@v2
       with:
-        swift-version: '6.0' # Используем свежий Swift с поддержкой Embedded
+        swift-version: '6.0'
 
-    - name: 🚀 Запуск компиляции (Makefile)
+    - name: 🚀 Запуск компиляции
       run: |
+        # Скрипт сам найдет Makefile, где бы он ни лежал, и запустит сборку там
+        MAKEFILE_PATH=$(find . -name "Makefile" | head -n 1)
+        if [ -z "$MAKEFILE_PATH" ]; then
+          echo "❌ Ошибка: Makefile не найден в репозитории!"
+          exit 1
+        fi
+        cd $(dirname "$MAKEFILE_PATH")
         make clean
         make all
 
     - name: 💾 Сохранение готовой прошивки
-      uses: actions/upload-artifact@v4 # <-- ВОТ ТУТ ИСПРАВЛЕНО!
+      uses: actions/upload-artifact@v4
       with:
         name: aura_os_firmware
-        path: aura_os.img # Сохраняем получившийся образ системы
+        path: "**/aura_os.img" # Ищет готовый образ в любой папке, где он собрался
