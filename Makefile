@@ -25,7 +25,12 @@ SWIFT_SERVICES := \
     $(SYS_DIR)/ControlCenter.swift \
     $(SYS_DIR)/CameraApp.swift \
     $(SYS_DIR)/AuraTaskManager.swift \
-    $(SYS_DIR)/AuraMessagesApp.swift
+    $(SYS_DIR)/AuraMessagesApp.swift \
+    $(SYS_DIR)/AuraSettingsApp.swift \
+    $(SYS_DIR)/AuraPhoneApp.swift \
+    $(SYS_DIR)/AuraNetworkStack.swift \
+    $(SYS_DIR)/AuraSurfApp.swift \
+    $(SYS_DIR)/AuraPhotosApp.swift
 
 # Объектные файлы, которые получатся после компиляции Swift
 SWIFT_OBJS     := $(BUILD_DIR)/services.o
@@ -34,7 +39,7 @@ SWIFT_OBJS     := $(BUILD_DIR)/services.o
 OUTPUT_IMG     := aura_os.img
 OUTPUT_ELF     := $(BUILD_DIR)/aura_os.elf
 
-# Флаги компиляции Swift для работы в режиме "голого железа" (без ОС Apple)
+# Флаги компиляции Swift для работы в режиме "голого железа" (Embedded Swift)
 SWIFT_FLAGS    := -target arm64-apple-none -O -parse-as-library -enable-experimental-feature EmbeddedSwift
 
 # ==============================================================================
