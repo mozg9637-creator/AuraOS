@@ -13,12 +13,6 @@ jobs:
     - name: 📥 Скачивание репозитория
       uses: actions/checkout@v4
 
-    - name: 🔍 Поиск Makefile и файлов проекта
-      run: |
-        echo "=== СТРУКТУРА КОРНЯ РЕПОЗИТОРИЯ ==="
-        ls -la
-        echo "==================================="
-
     - name: 🛠️ Установка системных утилит (lld, objcopy)
       run: |
         sudo apt update
@@ -36,31 +30,27 @@ jobs:
 
     - name: 🚀 Запуск компиляции
       run: |
-        # Автоматический поиск Makefile в репозитории
         MAKEFILE_PATH=$(find . -name "Makefile" | head -n 1)
         if [ -z "$MAKEFILE_PATH" ]; then
           echo "❌ Ошибка: Файл Makefile вообще не найден в репозитории!"
           exit 1
         fi
         
-        # Переходим в директорию, где лежит найденный Makefile
         cd $(dirname "$MAKEFILE_PATH")
         
-        echo "=== ПРОВЕРКА ОКРУЖЕНИЯ ПЕРЕД СБОРКОЙ ==="
-        echo "Текущая рабочая директория: $(pwd)"
-        echo "Содержимое папки sys_services:"
-        ls -la sys_services || echo "⚠️ Папка sys_services не найдена по этому пути!"
-        echo "Содержимое папки src:"
-        ls -la src || echo "⚠️ Папка src не найдена по этому пути!"
-        echo "========================================"
-        
-        echo "--- Запуск сборки системы ---"
-        # Запускаем make со стандартным выводом всех шагов компиляции
+        echo "--- Запуск чистой сборки ---"
+        # Запускаем сборку вручную, чтобы перехватить текстовый вывод ошибок Swift
         make clean
-        make all
+        
+        echo "📦 Компиляция Rust микроядра..."
+        cargo build --target arm64-auraos-none --release || exit 2
+        
+        echo "🎨 Компиляция Swift сервисов..."
+        # Запускаем swiftc напрямую, чтобы увидеть полную трассировку ошибок
+        swiftc -target arm64-apple-none -O -parse-as-library -enable-experimental-feature EmbeddedSwift sys_services/*.swift -o build/services.o
 
     - name: 💾 Сохранение готовой прошивки
-      if: success() # Выполняется только если сборка прошла успешно
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: aura_os_firmware
