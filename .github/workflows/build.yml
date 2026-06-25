@@ -34,7 +34,7 @@ jobs:
         make all
 
     - name: 💾 Сохранение готовой прошивки
-      uses: actions/artifacts@v4
+      uses: actions/upload-artifact@v4 # <-- ВОТ ТУТ ИСПРАВЛЕНО!
       with:
         name: aura_os_firmware
         path: aura_os.img # Сохраняем получившийся образ системы
