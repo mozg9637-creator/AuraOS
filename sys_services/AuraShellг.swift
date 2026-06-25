@@ -1,6 +1,6 @@
 import EmbeddedSwift
 import AuraGraphics      // Низкоуровневый графический движок (Fluid Motion Engine)
-import AuraHardware      // Работа с сенсорами устройства
+import AuraHardware      // Работа с сенсорами и экраном устройства
 
 /// Глобальные состояния операционной системы AuraOS
 enum ShellState {
@@ -22,13 +22,13 @@ class AuraShell {
     let screenWidth: Float = 1170.0
     let screenHeight: Float = 2532.0
     
-    // Экземпляры системных подсистем и приложений
+    // Экземпляры системных подсистем и интерфейсов
     private var lockScreen = LockScreen()
     private var homeScreen = HomeScreen()
     private var controlCenter = ControlCenter()
-    private var taskManager = AppSwitcher() // Наш переименованный AuraTaskManager
+    private var taskManager = AppSwitcher() // Наш менеджер задач AuraTaskManager
     
-    // Активное в данный момент приложение (Камера, Сообщения, Телефон или Настройки)
+    // Активное в данный момент приложение
     private var activeApplication: AuraApplication? = nil
     
     // Переменные для отслеживания жестов свайпа
@@ -51,11 +51,38 @@ class AuraShell {
         // Форсируем аппаратную вертикальную синхронизацию на 144 Гц
         AuraDisplayDriver.setRefreshRate(144)
         
+        // 🔥 ЭКРАН ЗАГРУЗКИ: Отрисовываем твой фирменный логотип-маскот перед запуском системы
+        renderBootSplash()
+        
         // Подгружаем список процессов для менеджера многозадачности
         taskManager.loadActiveProcesses()
         
         // Запускаем бесконечный цикл рендеринга интерфейса (Render Loop)
         startRenderLoop()
+    }
+    
+    /// Отрисовка кастомного Boot Logo (Троллфейс из image_842257.png)
+    private func renderBootSplash() {
+        AuraDisplayDriver.clearFrame()
+        
+        // Загружаем текстуру твоего неонового логотипа
+        let logoTextureId = AuraGraphics.TextureManager.loadPNG("image_842257.png")
+        let logoSize: Float = 512.0
+        
+        // Выводим логотип строго по центру черного экрана
+        AuraPainter.drawTexture(
+            logoTextureId, 
+            x: (screenWidth - logoSize) / 2, 
+            y: (screenHeight - logoSize) / 2, 
+            width: logoSize, 
+            height: logoSize
+        )
+        
+        // Системный статус загрузки снизу
+        AuraPainter.drawText("AuraOS is loading...", x: screenWidth / 2 - 100, y: screenHeight - 300, font: .systemRegular(size: 16), color: .gray)
+        
+        AuraDisplayDriver.swapBuffers()
+        AuraTime.delay(ms: 2000) // Задержка в 2 секунды, чтобы рассмотреть логотип при буте
     }
     
     /// Глобальный цикл отрисовки интерфейса (Отрабатывает каждые ~6.9 миллисекунд при 144 Гц)
@@ -106,16 +133,13 @@ class AuraShell {
         
         switch netType {
         case .none:
-            // Отрендерить иконку "Нет сети"
             AuraPainter.drawIcon(.no_network, x: screenWidth - 160, y: 40, tint: .systemRed)
             
         case .wiFi(_, let strength):
-            // Динамический выбор иконки Wi-Fi по уровню сигнала RSSI
             let wifiIcon = strength > -50 ? .wifi_full : .wifi_low
             AuraPainter.drawIcon(wifiIcon, x: screenWidth - 160, y: 40, tint: .white)
             
         case .cellular(_, let generation):
-            // Рендер сотовой сети (Текст "5G" / "LTE" + Антенны)
             AuraPainter.drawText(generation, x: screenWidth - 210, y: 43, font: .systemBold(size: 12), color: .white)
             AuraPainter.drawIcon(.cellular_bars, x: screenWidth - 160, y: 40, tint: .white)
         }
@@ -143,7 +167,7 @@ class AuraShell {
         changeState(to: .appRunning)
     }
     
-    /// Закрытие приложения и возврат на домашний экран (Аналог нажатия Home / Свайпа снизу)
+    /// Закрытие приложения и возврат на домашний экран (Аналог свайпа снизу)
     func closeCurrentApplication() {
         self.activeApplication = nil
         changeState(to: .homeScreen)
@@ -153,82 +177,4 @@ class AuraShell {
     // 🎛️ Глобальный Диспетчер Тачскрина (Touch & Gestures Router)
     // ==============================================================================
     
-    func handleTouch(x: Float, y: Float, eventType: TouchEvent) {
-        switch eventType {
-        case .touchDown:
-            touchStartX = x
-            touchStartY = y
-            isDraggingNotificationOrControl = false
-            
-            // Направляем тап в активный слой
-            forwardTouchToActiveLayer(x: x, y: y, event: eventType)
-            
-        case .touchMove(let currentY):
-            let deltaY = currentY - touchStartY
-            let deltaX = x - touchStartX
-            
-            // Жест: Свайп сверху-справа экрана вниз (Вызов Центра Управления / Шторки)
-            if touchStartY < 100 && touchStartX > (screenWidth - 300) && deltaY > 50 {
-                isDraggingNotificationOrControl = true
-                changeState(to: .controlCenterMode)
-                controlCenter.currentExpansion = min(1.0, deltaY / 600.0) // 600px — полный ход открытия
-                return
-            }
-            
-            // Жест: Длинный свайп снизу экрана вверх (Вызов Многозадачности / App Switcher)
-            if touchStartY > (screenHeight - 150) && deltaY < -200 {
-                taskManager.loadActiveProcesses()
-                changeState(to: .appSwitcherMode)
-                return
-            }
-            
-            // Обычная трансляция движения в интерфейсы
-            if isDraggingNotificationOrControl {
-                controlCenter.currentExpansion = min(1.0, max(0.0, deltaY / 600.0))
-            } else {
-                forwardTouchToActiveLayer(x: x, y: y, event: .drag(deltaX: deltaX, deltaY: deltaY))
-            }
-            
-        case .touchUp:
-            if isDraggingNotificationOrControl {
-                // Доводчик шторки: если открыли больше чем наполовину — фиксируем, иначе закрываем
-                if controlCenter.currentExpansion > 0.5 {
-                    controlCenter.currentExpansion = 1.0
-                } else {
-                    controlCenter.currentExpansion = 0.0
-                    changeState(to: .homeScreen)
-                }
-                isDraggingNotificationOrControl = false
-                return
-            }
-            
-            forwardTouchToActiveLayer(x: x, y: y, event: eventType)
-        default:
-            break
-        }
-    }
-    
-    /// Внутренняя маршрутизация тапов в зависимости от того, что сейчас открыто на экране телефоне
-    private func forwardTouchToActiveLayer(x: Float, y: Float, event: TouchEvent) {
-        switch currentState {
-        case .lockScreen:
-            lockScreen.handleTouch(x: x, y: y, event: event)
-        case .homeScreen:
-            homeScreen.handleGlobalTouch(x: x, y: y, event: event)
-        case .appSwitcherMode:
-            taskManager.handleTouch(x: x, y: y, event: event)
-        case .controlCenterMode:
-            controlCenter.handleTouch(x: x, y: y, event: event)
-        case .appRunning:
-            if let app = activeApplication as? CameraApp {
-                app.handleTouch(x: x, y: y, event: event)
-            } else if let app = activeApplication as? AuraMessagesApp {
-                app.handleTouch(x: x, y: y, event: event)
-            } else if let app = activeApplication as? AuraSettingsApp {
-                app.handleTouch(x: x, y: y, event: event)
-            } else if let app = activeApplication as? AuraPhoneApp {
-                app.handleTouch(x: x, y: y, event: event)
-            }
-        }
-    }
-}
+    func handleTouch(x: Float, y: Float, eventType
