@@ -16,16 +16,13 @@ class AuraShell {
     static let shared = AuraShell()
     
     // Текущий режим работы интерфейса
-    private var currentState: ShellState = .lockScreen
+    private var currentState: ShellState = .homeScreen // Сразу загружаемся на рабочий стол
     
     // Физические параметры дисплея смартфона
     let screenWidth: Float = 1170.0
     let screenHeight: Float = 2532.0
     
     // Экземпляры системных подсистем и интерфейсов
-    private var lockScreen = LockScreen()
-    private var homeScreen = HomeScreen()
-    private var controlCenter = ControlCenter()
     private var taskManager = AppSwitcher() // Наш менеджер задач AuraTaskManager
     
     // Активное в данный момент приложение
@@ -94,18 +91,20 @@ class AuraShell {
             // 2. Отрендерить текущую активную сцену на основе стейта системы
             switch currentState {
             case .lockScreen:
-                lockScreen.render()
+                // Временная заглушка, пока нет файла LockScreen.swift
+                AuraPainter.drawText("Lock Screen (Swipe Up to Unlock)", x: 200, y: 500, font: .systemBold(size: 24), color: .white)
                 
             case .homeScreen:
-                homeScreen.render(atX: 0, y: 0)
+                // Временная заглушка: просто чистый рабочий стол с текстом
+                AuraPainter.drawText("AuraOS Home Screen", x: 300, y: 400, font: .systemBold(size: 32), color: .cyan)
+                AuraPainter.drawText("Apps are ready.", x: 300, y: 460, font: .systemRegular(size: 18), color: .gray)
                 
             case .appSwitcherMode:
                 taskManager.render()
                 
             case .controlCenterMode:
-                // Рендерим рабочий стол, а поверх него — выезжающую шторку
-                homeScreen.render(atX: 0, y: 0)
-                controlCenter.render()
+                // Временная заглушка вместо ControlCenter.swift
+                AuraPainter.drawText("Control Center Active", x: 350, y: 200, font: .systemBold(size: 24), color: .green)
                 
             case .appRunning:
                 if let app = activeApplication {
@@ -113,7 +112,7 @@ class AuraShell {
                 }
             }
             
-            // 3. Поверх любой сцены ВСЕГДА рисуем динамический Статус-бар (кроме режима шторки на весь экран)
+            // 3. Поверх любой сцены ВСЕГДА рисуем динамический Статус-бар
             if currentState != .controlCenterMode {
                 renderSystemStatusBar()
             }
@@ -155,10 +154,8 @@ class AuraShell {
         AuraHaptics.vibrate(.lightClick) // Мягкий тактильный клик при переходах
     }
     
-    /// Метод принудительного обновления кадра (вызывается сетевым стеком при смене Wi-Fi -> 5G)
-    func triggerStatusBarUpdate() {
-        // Сигнал композитору пересчитать слой иконок сети в следующем кадре
-    }
+    /// Метод принудительного обновления кадра
+    func triggerStatusBarUpdate() {}
     
     /// Системный запуск приложения внутри оболочки
     func openApplication(_ app: AuraApplication) {
@@ -167,7 +164,7 @@ class AuraShell {
         changeState(to: .appRunning)
     }
     
-    /// Закрытие приложения и возврат на домашний экран (Аналог свайпа снизу)
+    /// Закрытие приложения и возврат на домашний экран
     func closeCurrentApplication() {
         self.activeApplication = nil
         changeState(to: .homeScreen)
@@ -177,4 +174,59 @@ class AuraShell {
     // 🎛️ Глобальный Диспетчер Тачскрина (Touch & Gestures Router)
     // ==============================================================================
     
-    func handleTouch(x: Float, y: Float, eventType
+    func handleTouch(x: Float, y: Float, eventType: TouchEvent) {
+        switch eventType {
+        case .touchDown:
+            touchStartX = x
+            touchStartY = y
+            isDraggingNotificationOrControl = false
+            forwardTouchToActiveLayer(x: x, y: y, event: eventType)
+            
+        case .touchMove(let currentY):
+            let deltaY = currentY - touchStartY
+            let deltaX = x - touchStartX
+            
+            if touchStartY < 100 && touchStartX > (screenWidth - 300) && deltaY > 50 {
+                isDraggingNotificationOrControl = true
+                changeState(to: .controlCenterMode)
+                return
+            }
+            
+            if touchStartY > (screenHeight - 150) && deltaY < -200 {
+                taskManager.loadActiveProcesses()
+                changeState(to: .appSwitcherMode)
+                return
+            }
+            
+            if !isDraggingNotificationOrControl {
+                forwardTouchToActiveLayer(x: x, y: y, event: .drag(deltaX: deltaX, deltaY: deltaY))
+            }
+            
+        case .touchUp:
+            if isDraggingNotificationOrControl {
+                isDraggingNotificationOrControl = false
+                return
+            }
+            forwardTouchToActiveLayer(x: x, y: y, event: eventType)
+        default:
+            break
+        }
+    }
+    
+    /// Внутренняя маршрутизация тапов в зависимости от открытого софта
+    private func forwardTouchToActiveLayer(x: Float, y: Float, event: TouchEvent) {
+        switch currentState {
+        case .appSwitcherMode:
+            taskManager.handleTouch(x: x, y: y, event: event)
+        case .appRunning:
+            if let app = activeApplication as? CameraApp { app.handleTouch(x: x, y: y, event: event) }
+            else if let app = activeApplication as? AuraMessagesApp { app.handleTouch(x: x, y: y, event: event) }
+            else if let app = activeApplication as? AuraSettingsApp { app.handleTouch(x: x, y: y, event: event) }
+            else if let app = activeApplication as? AuraPhoneApp { app.handleTouch(x: x, y: y, event: event) }
+            else if let app = activeApplication as? AuraSurfApp { app.handleTouch(x: x, y: y, event: event) }
+            else if let app = activeApplication as? AuraPhotosApp { app.handleTouch(x: x, y: y, event: event) }
+        default:
+            break
+        }
+    }
+}
