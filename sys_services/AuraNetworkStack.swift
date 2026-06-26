@@ -1,20 +1,24 @@
 import EmbeddedSwift
 
-/// Типы сетевых интерфейсов AuraOS (Добавлено глобально для исправления ошибки компиляции)
+/// Типы сетевых интерфейсов AuraOS
 enum NetworkInterfaceType {
     case none
-    case wiFi(ssid: Any, strength: Int)
-    case cellular(provider: Any, generation: String)
+    case wiFi(ssid: Int, strength: Int)
+    case cellular(provider: Int, generation: Int)
 }
 
+// Глобальный экземпляр для линкера, чтобы избежать скрытых вызовов thread-safe инициализации
+private let _globalSharedNetworkStack = AuraNetworkStack()
+
 class AuraNetworkStack {
-    static let shared = AuraNetworkStack()
+    // Безопасный для Embedded Swift синглтон без вызова скрытых библиотечных геттеров
+    static var shared: AuraNetworkStack {
+        return _globalSharedNetworkStack
+    }
     
-    // Теперь этот тип гарантированно находится в scope
     var activeInterface: NetworkInterfaceType = .none
     
-    private init() {
-        // Базовая инициализация драйвера сетевой карты
+    fileprivate init() {
         setupDefaultInterface()
     }
     
