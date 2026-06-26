@@ -62,7 +62,6 @@ enum TouchEvent {
 // ГЛОБАЛЬНЫЕ ТИПЫ И СОСТОЯНИЯ СИСТЕМЫ
 // ==========================================
 
-/// Глобальные состояния операционной системы AuraOS
 enum ShellState {
     case lockScreen
     case homeScreen
@@ -75,45 +74,42 @@ enum ShellState {
 // ОСНОВНОЙ КЛАСС ОБОЛОЧКИ AURA SHELL
 // ==========================================
 
+// Глобальный приватный экземпляр оболочки, чтобы линкер не искал скрытые геттеры
+private let _globalSharedShell = AuraShell()
+
 /// Главный системный композитор и менеджер окон AuraOS
 class AuraShell {
-    // Безопасная инициализация синглтона без скрытых thread-safe геттеров компилятора
-    static let shared = AuraShell()
     
-    // Текущий режим работы интерфейса (динамическое изменяемое свойство)
+    // Безопасный вызов синглтона для Bare-Metal компиляции
+    static var shared: AuraShell {
+        return _globalSharedShell
+    }
+    
+    // Текущий режим работы интерфейса
     private var currentState: ShellState = .homeScreen
     
     // Физические параметры дисплея смартфона
     let screenWidth: Float = 1170.0
     let screenHeight: Float = 2532.0
     
-    // Активное в данный момент приложение
     private var activeApplication: Any? = nil
-    
-    // Переменные для отслеживания жестов свайпа
     private var touchStartX: Float = 0.0
     private var touchStartY: Float = 0.0
     private var isDraggingNotificationOrControl: Bool = false
     
-    private init() {}
+    fileprivate init() {}
     
-    /// Главная точка входа графической оболочки (вызывается из ядра Rust при старте)
+    /// Главная точка входа графической оболочки
     func bootShell() {
         print("🌌 AuraOS UI: Запуск Fluid Motion Engine...")
         
-        // Резервируем кадровый буфер (Framebuffer) дисплея через видеочип
         guard AuraDisplayDriver.initialize(width: screenWidth, height: screenHeight) else {
             print("Критический сбой: Видеочип дисплея не отвечает!")
             return
         }
         
-        // Форсируем аппаратную вертикальную синхронизацию на 144 Гц
         AuraDisplayDriver.setRefreshRate(144)
-        
-        // 🔥 ЭКРАН ЗАГРУЗКИ: Твой фирменный логотип-маскот перед запуском системы
         renderBootSplash()
-        
-        // Запускаем бесконечный цикл рендеринга интерфейса (Render Loop)
         startRenderLoop()
     }
     
@@ -121,11 +117,9 @@ class AuraShell {
     private func renderBootSplash() {
         AuraDisplayDriver.clearFrame()
         
-        // Загружаем текстуру твоего неонового логотипа
         let logoTextureId = TextureManager.loadPNG("image_842257.png")
         let logoSize: Float = 512.0
         
-        // Выводим логотип строго по центру черного экрана
         AuraPainter.drawTexture(
             logoTextureId, 
             x: (screenWidth - logoSize) / 2, 
@@ -134,14 +128,13 @@ class AuraShell {
             height: logoSize
         )
         
-        // Системный статус загрузки снизу
         AuraPainter.drawText("AuraOS is loading...", x: screenWidth / 2 - 100, y: screenHeight - 300, font: .systemRegular(size: 16), color: .gray)
         
         AuraDisplayDriver.swapBuffers()
-        AuraTime.delay(ms: 2000) // Пауза на экране загрузки (2 секунды)
+        AuraTime.delay(ms: 2000)
     }
     
-    /// Глобальный цикл отрисовки графики и сцен интерфейса
+    /// Глобальный цикл отрисовки графики
     private func startRenderLoop() {
         while true {
             AuraDisplayDriver.clearFrame()
@@ -149,22 +142,17 @@ class AuraShell {
             switch currentState {
             case .lockScreen:
                 AuraPainter.drawText("Lock Screen (Swipe Up to Unlock)", x: 200, y: 500, font: .systemBold(size: 24), color: .white)
-                
             case .homeScreen:
                 AuraPainter.drawText("AuraOS Home Screen", x: 300, y: 400, font: .systemBold(size: 32), color: .cyan)
                 AuraPainter.drawText("Apps are ready.", x: 300, y: 460, font: .systemRegular(size: 18), color: .gray)
-                
             case .appSwitcherMode:
                 AuraPainter.drawText("App Switcher Active", x: 300, y: 300, font: .systemBold(size: 24), color: .orange)
-                
             case .controlCenterMode:
                 AuraPainter.drawText("Control Center Active", x: 350, y: 200, font: .systemBold(size: 24), color: .green)
-                
             case .appRunning:
                 AuraPainter.drawText("Application Running...", x: 300, y: 400, font: .systemRegular(size: 20), color: .white)
             }
             
-            // Поверх любой сцены (кроме развернутого Пункта Управления) рисуем динамический Статус-бар
             if currentState != .controlCenterMode {
                 renderSystemStatusBar()
             }
@@ -173,11 +161,10 @@ class AuraShell {
         }
     }
     
-    /// Динамический статус-бар (Интеграция с AuraNetworkStack в стиле iOS)
+    /// Динамический статус-бар
     private func renderSystemStatusBar() {
         AuraPainter.drawText("20:42", x: 60, y: 40, font: .systemBold(size: 15), color: .white)
         
-        // Безопасный опрос сетевого стека
         let netType = AuraNetworkStack.shared.activeInterface
         
         switch netType {
@@ -192,7 +179,6 @@ class AuraShell {
         AuraPainter.drawIcon(.battery, x: screenWidth - 80, y: 40, tint: .white)
     }
     
-    /// Смена текущего состояния экрана с тактильной отдачей
     func changeState(to newState: ShellState) {
         self.currentState = newState
         AuraHaptics.vibrate(.lightClick)
@@ -200,36 +186,28 @@ class AuraShell {
     
     func triggerStatusBarUpdate() {}
     
-    /// Корректный выход из активного приложения
     func closeCurrentApplication() {
         self.activeApplication = nil
         changeState(to: .homeScreen)
     }
     
-    /// Обработчик сенсорного экрана и жестов свайпа
     func handleTouch(x: Float, y: Float, eventType: TouchEvent) {
         switch eventType {
         case .touchDown:
             touchStartX = x
             touchStartY = y
             isDraggingNotificationOrControl = false
-            
         case .touchMove(let currentY):
             let deltaY = currentY - touchStartY
-            
-            // Свайп из верхнего правого угла — открываем Пункт Управления (Control Center)
             if touchStartY < 100 && touchStartX > (screenWidth - 300) && deltaY > 50 {
                 isDraggingNotificationOrControl = true
                 changeState(to: .controlCenterMode)
                 return
             }
-            
-            // Свайп снизу вверх — открываем Меню Многозадачности (App Switcher)
             if touchStartY > (screenHeight - 150) && deltaY < -200 {
                 changeState(to: .appSwitcherMode)
                 return
             }
-            
         case .touchUp:
             if isDraggingNotificationOrControl {
                 isDraggingNotificationOrControl = false
