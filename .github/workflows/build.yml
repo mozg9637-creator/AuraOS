@@ -2,7 +2,7 @@ name: Cloud Build AuraOS
 
 on:
   push:
-    branches: [ "**" ] # Срабатывает на абсолютно любые пуши в любые ветки
+    branches: [ "**" ] # Срабатывает на любые пуши в любые ветки
   workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой в браузере
 
 jobs:
@@ -28,30 +28,13 @@ jobs:
       with:
         swift-version: '6.0'
 
-    - name: 🚀 Запуск компиляции
+    - name: 🚀 Тестовая компиляция и вывод ошибок
       run: |
-        MAKEFILE_PATH=$(find . -name "Makefile" | head -n 1)
-        if [ -z "$MAKEFILE_PATH" ]; then
-          echo "❌ Ошибка: Файл Makefile вообще не найден в репозитории!"
-          exit 1
-        fi
+        mkdir -p build
+        echo "=== ПРОВЕРКА ФАЙЛОВ В SYS_SERVICES ==="
+        ls -la sys_services
+        echo "======================================="
         
-        cd $(dirname "$MAKEFILE_PATH")
-        
-        echo "--- Запуск чистой сборки ---"
-        # Запускаем сборку вручную, чтобы перехватить текстовый вывод ошибок Swift
-        make clean
-        
-        echo "📦 Компиляция Rust микроядра..."
-        cargo build --target arm64-auraos-none --release || exit 2
-        
-        echo "🎨 Компиляция Swift сервисов..."
-        # Запускаем swiftc напрямую, чтобы увидеть полную трассировку ошибок
+        echo "🎨 Запуск компилятора Swift напрямую..."
+        # Запуск напрямую покажет, какие файлы конфликтуют или какие типы не найдены
         swiftc -target arm64-apple-none -O -parse-as-library -enable-experimental-feature EmbeddedSwift sys_services/*.swift -o build/services.o
-
-    - name: 💾 Сохранение готовой прошивки
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: aura_os_firmware
-        path: "**/aura_os.img"
