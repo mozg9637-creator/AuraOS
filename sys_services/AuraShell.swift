@@ -74,10 +74,16 @@ enum ShellState {
 // ОСНОВНАЯ СТРУКТУРА ОБОЛОЧКИ AURA SHELL
 // ==========================================
 
-/// Главный системный композитор и менеджер окон AuraOS (struct для идеальной линковки)
+/// Точка связи с Rust. Экспортирует имя функции без Swift-манглинга
+@_cdecl("bootShell")
+public func bootShellOutside() {
+    AuraShell.shared.bootShell()
+}
+
+/// Главный системный композитор и менеджер окон AuraOS
 struct AuraShell {
     
-    // Статический синглтон для структуры
+    // Статический синглтон для прямого обращения на низком уровне
     static var shared = AuraShell()
     
     // Текущий режим работы интерфейса
@@ -93,7 +99,7 @@ struct AuraShell {
     
     init() {}
     
-    /// Главная точка входа графической оболочки
+    /// Главная точка входа графической оболочки (вызывается из функции bootShellOutside)
     mutating func bootShell() {
         print("🌌 AuraOS UI: Запуск Fluid Motion Engine...")
         
