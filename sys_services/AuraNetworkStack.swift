@@ -7,26 +7,23 @@ enum NetworkInterfaceType {
     case cellular(provider: Int, generation: Int)
 }
 
-// Глобальный экземпляр для линкера, чтобы избежать скрытых вызовов thread-safe инициализации
-private let _globalSharedNetworkStack = AuraNetworkStack()
-
-class AuraNetworkStack {
-    // Безопасный для Embedded Swift синглтон без вызова скрытых библиотечных геттеров
-    static var shared: AuraNetworkStack {
-        return _globalSharedNetworkStack
-    }
+/// Сетевой стек системы (Изменено class на struct для Bare-Metal совместимости)
+struct AuraNetworkStack {
+    
+    // В Bare-Metal для структур синглтон реализуется через статическую переменную
+    static var shared = AuraNetworkStack()
     
     var activeInterface: NetworkInterfaceType = .none
     
-    fileprivate init() {
+    init() {
         setupDefaultInterface()
     }
     
-    private func setupDefaultInterface() {
+    private mutating func setupDefaultInterface() {
         self.activeInterface = .none
     }
     
-    func updateInterfaceStatus(to newInterface: NetworkInterfaceType) {
+    mutating func updateInterfaceStatus(to newInterface: NetworkInterfaceType) {
         self.activeInterface = newInterface
     }
 }
