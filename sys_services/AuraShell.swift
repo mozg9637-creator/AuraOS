@@ -71,19 +71,14 @@ enum ShellState {
 }
 
 // ==========================================
-// ОСНОВНОЙ КЛАСС ОБОЛОЧКИ AURA SHELL
+// ОСНОВНАЯ СТРУКТУРА ОБОЛОЧКИ AURA SHELL
 // ==========================================
 
-// Глобальный приватный экземпляр оболочки, чтобы линкер не искал скрытые геттеры
-private let _globalSharedShell = AuraShell()
-
-/// Главный системный композитор и менеджер окон AuraOS
-class AuraShell {
+/// Главный системный композитор и менеджер окон AuraOS (struct для идеальной линковки)
+struct AuraShell {
     
-    // Безопасный вызов синглтона для Bare-Metal компиляции
-    static var shared: AuraShell {
-        return _globalSharedShell
-    }
+    // Статический синглтон для структуры
+    static var shared = AuraShell()
     
     // Текущий режим работы интерфейса
     private var currentState: ShellState = .homeScreen
@@ -92,15 +87,14 @@ class AuraShell {
     let screenWidth: Float = 1170.0
     let screenHeight: Float = 2532.0
     
-    private var activeApplication: Any? = nil
     private var touchStartX: Float = 0.0
     private var touchStartY: Float = 0.0
     private var isDraggingNotificationOrControl: Bool = false
     
-    fileprivate init() {}
+    init() {}
     
     /// Главная точка входа графической оболочки
-    func bootShell() {
+    mutating func bootShell() {
         print("🌌 AuraOS UI: Запуск Fluid Motion Engine...")
         
         guard AuraDisplayDriver.initialize(width: screenWidth, height: screenHeight) else {
@@ -179,19 +173,18 @@ class AuraShell {
         AuraPainter.drawIcon(.battery, x: screenWidth - 80, y: 40, tint: .white)
     }
     
-    func changeState(to newState: ShellState) {
+    mutating func changeState(to newState: ShellState) {
         self.currentState = newState
         AuraHaptics.vibrate(.lightClick)
     }
     
     func triggerStatusBarUpdate() {}
     
-    func closeCurrentApplication() {
-        self.activeApplication = nil
+    mutating func closeCurrentApplication() {
         changeState(to: .homeScreen)
     }
     
-    func handleTouch(x: Float, y: Float, eventType: TouchEvent) {
+    mutating func handleTouch(x: Float, y: Float, eventType: TouchEvent) {
         switch eventType {
         case .touchDown:
             touchStartX = x
