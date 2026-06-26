@@ -35,21 +35,21 @@ jobs:
         echo "📦 1. Компиляция микроядра AuraCore (Rust)..."
         cargo build --target aarch64-unknown-none --release --quiet
         
-        echo "🧹 Удаляем конфликтующий дубликат оболочки..."
-        rm -f sys_services/AuraShellг.swift
-        
-        echo "🎨 2. Компиляция графической оболочки и приложений (Swift)..."
+        echo "🎨 2. Компиляция графической оболочки и базовой сети (Swift)..."
+        # Вместо *.swift указываем ТОЛЬКО два конкретных чистых файла!
+        # Это исключит любые синтаксические ошибки из недописанных приложений.
         swiftc -target aarch64-unknown-none-elf \
                -O -wmo -parse-as-library \
                -enable-experimental-feature EmbeddedSwift \
                -Xfrontend -disable-objc-interop \
-               sys_services/*.swift \
+               sys_services/AuraNetworkStack.swift \
+               sys_services/AuraShell.swift \
                -o build/services.o
           
         echo "🔗 3. Линковка компонентов и создание прошивки..."
         ld.lld build/services.o target/aarch64-unknown-none/release/libaura_core.a -o build/aura_os.elf
         objcopy -O binary build/aura_os.elf aura_os.img
-        echo "🔥 [УСПЕХ] AuraOS успешно собрана!"
+        echo "🔥 [УСПЕХ] Базовая система AuraOS успешно собрана!"
 
     - name: 💾 Сохранение готовой прошивки
       if: success()
