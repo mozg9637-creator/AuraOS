@@ -2,8 +2,8 @@ name: Cloud Build AuraOS
 
 on:
   push:
-    branches: [ "**" ] # Срабатывает на любые пуши в любые ветки
-  workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой в браузере
+    branches: [ "**" ]
+  workflow_dispatch:
 
 jobs:
   build-os:
@@ -35,8 +35,10 @@ jobs:
         echo "📦 1. Компиляция микроядра AuraCore (Rust)..."
         cargo build --target aarch64-unknown-none --release --quiet
         
+        echo "🧹 Удаляем конфликтующий дубликат оболочки..."
+        rm -f sys_services/AuraShellг.swift
+        
         echo "🎨 2. Компиляция графической оболочки и приложений (Swift)..."
-        # Используем правильный кросс-компиляционный таргет aarch64-unknown-none-elf и флаг -wmo
         swiftc -target aarch64-unknown-none-elf \
                -O -wmo -parse-as-library \
                -enable-experimental-feature EmbeddedSwift \
