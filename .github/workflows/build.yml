@@ -2,8 +2,8 @@ name: Cloud Build AuraOS
 
 on:
   push:
-    branches: [ "**" ]
-  workflow_dispatch:
+    branches: [ "**" ] # Срабатывает на любые пуши в любые ветки
+  workflow_dispatch:   # Позволяет запустить сборку вручную кнопкой в браузере
 
 jobs:
   build-os:
@@ -28,24 +28,26 @@ jobs:
       with:
         swift-version: '6.0'
 
-    - name: 🚀 Запуск изолированной компиляции
+    - name: 🚀 Полная компиляция AuraOS
       run: |
         mkdir -p build
         
-        echo "📦 1. Сборка ядра Rust..."
-        cargo build --target arm64-auraos-none --release --quiet
+        echo "📦 1. Компиляция микроядра AuraCore (Rust)..."
+        cargo build --target aarch64-unknown-none --release --quiet
         
-        echo "🎨 2. Сборка базовой оболочки Swift..."
-        # Компилируем ТОЛЬКО те файлы, которые гарантированно чисты от ошибок
-        swiftc -target arm64-apple-none -O -parse-as-library -enable-experimental-feature EmbeddedSwift \
-          sys_services/AuraNetworkStack.swift \
-          sys_services/AuraShellr.swift \
-          -o build/services.o
+        echo "🎨 2. Компиляция графической оболочки и приложений (Swift)..."
+        # Используем правильный кросс-компиляционный таргет aarch64-unknown-none-elf и флаг -wmo
+        swiftc -target aarch64-unknown-none-elf \
+               -O -wmo -parse-as-library \
+               -enable-experimental-feature EmbeddedSwift \
+               -Xfrontend -disable-objc-interop \
+               sys_services/*.swift \
+               -o build/services.o
           
-        echo "🔗 3. Линковка системы..."
-        ld.lld build/services.o target/arm64-auraos-none/release/libaura_core.a -o build/aura_os.elf
+        echo "🔗 3. Линковка компонентов и создание прошивки..."
+        ld.lld build/services.o target/aarch64-unknown-none/release/libaura_core.a -o build/aura_os.elf
         objcopy -O binary build/aura_os.elf aura_os.img
-        echo "✅ Система успешно собрана в обход проблемных приложений!"
+        echo "🔥 [УСПЕХ] AuraOS успешно собрана!"
 
     - name: 💾 Сохранение готовой прошивки
       if: success()
