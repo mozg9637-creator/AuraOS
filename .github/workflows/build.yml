@@ -1,29 +1,73 @@
-import EmbeddedSwift
+name: Cloud Build AuraOS
 
-/// Типы сетевых интерфейсов AuraOS
-enum NetworkInterfaceType {
-    case none
-    case wiFi(ssid: Int, strength: Int)
-    case cellular(provider: Int, generation: Int)
-}
+on:
+  push:
+    branches: [ "**" ]
+  workflow_dispatch:
 
-/// Сетевой стек системы (struct для Bare-Metal совместимости)
-struct AuraNetworkStack {
-    
-    // Статический синглтон, не создающий скрытых библиотечных вызовов
-    static var shared = AuraNetworkStack()
-    
-    var activeInterface: NetworkInterfaceType = .none
-    
-    init() {
-        setupDefaultInterface()
-    }
-    
-    private mutating func setupDefaultInterface() {
-        self.activeInterface = .none
-    }
-    
-    mutating func updateInterfaceStatus(to newInterface: NetworkInterfaceType) {
-        self.activeInterface = newInterface
-    }
-}
+jobs:
+  build-os:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Скачивание репозитория
+      uses: actions/checkout@v4
+
+    - name: 🛠️ Установка системных утилит (lld, objcopy)
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential lld binutils-aarch64-linux-gnu
+
+    - name: 📦 Настройка Rust и таргета ARM64
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-unknown-none
+
+    - name: 🎨 Настройка Swift (Embedded)
+      uses: swift-actions/setup-swift@v2
+      with:
+        swift-version: '6.0'
+
+    - name: 🚀 Полная компиляция AuraOS
+      run: |
+        mkdir -p build
+        
+        echo "📦 1. Компиляция микроядра AuraCore (Rust)..."
+        cargo build --target aarch64-unknown-none --release
+        
+        echo "🧹 Удаляем конфликтующие файлы..."
+        rm -f sys_services/AuraShellг.swift
+        
+        echo "🎨 2. Компиляция графической оболочки и приложений (Swift)..."
+        swiftc -target aarch64-unknown-none-elf \
+               -O -wmo -parse-as-library \
+               -enable-experimental-feature EmbeddedSwift \
+               -Xfrontend -disable-objc-interop \
+               sys_services/AuraNetworkStack.swift \
+               sys_services/AuraShell.swift \
+               -o build/services.o
+          
+        echo "🔗 3. Линковка компонентов и создание прошивки..."
+        # Автоматический поиск объектного файла, сгенерированного Cargo
+        RUST_OBJECT=$(find target/aarch64-unknown-none/release/deps/ -name "aura_os-*.rcgu.o" | head -n 1)
+        
+        if [ -z "$RUST_OBJECT" ]; then
+          echo "Ищем стандартный бинарник Rust..."
+          RUST_OBJECT="target/aarch64-unknown-none/release/aura_os"
+        fi
+
+        echo "Используем объектный файл Rust: $RUST_OBJECT"
+
+        # Связываем Swift-сервисы и ядро Rust в единый эльф-файл
+        ld.lld build/services.o $RUST_OBJECT -o build/aura_os.elf --allow-multiple-definition
+        
+        # Переводим в чистый бинарный образ для записи
+        objcopy -O binary build/aura_os.elf aura_os.img
+        echo "🔥 [УСПЕХ] AuraOS успешно собрана!"
+
+    - name: 💾 Сохранение готовой прошивки
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: aura_os_firmware
+        path: aura_os.img
