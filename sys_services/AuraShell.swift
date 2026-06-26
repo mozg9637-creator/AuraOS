@@ -15,7 +15,7 @@ enum ShellState {
 class AuraShell {
     static let shared = AuraShell()
     
-    // Текущий режим работы интерфейса (сделано var для возможности перезаписи)
+    // Текущий режим работы интерфейса (изменяемый var)
     private var currentState: ShellState = .homeScreen
     
     // Физические параметры дисплея смартфона
@@ -112,7 +112,6 @@ class AuraShell {
     private func renderSystemStatusBar() {
         AuraPainter.drawText("20:42", x: 60, y: 40, font: .systemBold(size: 15), color: .white)
         
-        // Опрос сетевого стека (безопасный вызов через заглушку)
         let netType = AuraNetworkStack.shared.activeInterface
         
         switch netType {
